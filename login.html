@@ -198,24 +198,19 @@
         </div>
 
         <div class="info-box">
-            <h3>Welcome Back!</h3>
-            <p>Sign in to continue to UID Manager.</p>
+            <h3>Welcome!</h3>
+            <p>Enter your license key to access UID Manager.</p>
         </div>
 
         <form id="loginForm">
             <div class="form-group">
-                <label for="username">Username</label>
-                <input type="text" id="username" name="username" placeholder="Enter your username" required autocomplete="off">
-            </div>
-
-            <div class="form-group">
-                <label for="password">Password</label>
-                <input type="password" id="password" name="password" placeholder="Enter your password" required>
+                <label for="licenseKey">License Key</label>
+                <input type="text" id="licenseKey" name="licenseKey" placeholder="XXXX-XXXX-XXXX-XXXX" required autocomplete="off">
             </div>
 
             <button type="submit" class="login-btn" id="loginBtn">
                 <span class="spinner"></span>
-                <span class="btn-text">Sign In</span>
+                <span class="btn-text">Access System</span>
             </button>
         </form>
 
@@ -231,50 +226,41 @@
         const loginBtn = document.getElementById('loginBtn');
         const result = document.getElementById('result');
 
-        // Check if already logged in
-        const token = localStorage.getItem('authToken');
-        if (token) {
-            fetch('/api/verify-session', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ token })
-            }).then(res => {
-                if (res.ok) window.location.href = 'index.html';
-            });
-        }
+        // No auto-login - always require key
+        // Clear any old session data
+        localStorage.removeItem('authToken');
+        localStorage.removeItem('maxDays');
 
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
 
-            const username = document.getElementById('username').value.trim();
-            const password = document.getElementById('password').value;
+            const licenseKey = document.getElementById('licenseKey').value.trim().toUpperCase();
 
             loginBtn.classList.add('loading');
             result.className = 'result';
 
             try {
-                const response = await fetch('/api/login', {
+                const response = await fetch('/api/validate-key', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                         'Accept': 'application/json'
                     },
-                    body: JSON.stringify({ username, password })
+                    body: JSON.stringify({ key: licenseKey })
                 });
 
                 const data = await response.json();
 
                 if (!response.ok) {
-                    throw new Error(data.error || 'Login failed');
+                    throw new Error(data.error || 'Invalid license key');
                 }
 
-                // Store auth token
-                localStorage.setItem('authToken', data.token);
-                localStorage.setItem('username', data.username);
-                localStorage.setItem('loginTime', new Date().toISOString());
+                // Store session token temporarily (will be cleared on logout)
+                sessionStorage.setItem('authToken', data.token);
+                sessionStorage.setItem('maxDays', data.maxDays);
 
                 result.className = 'result success';
-                result.textContent = 'Login successful! Redirecting...';
+                result.textContent = 'Access granted! Redirecting...';
 
                 setTimeout(() => {
                     window.location.href = 'index.html';
