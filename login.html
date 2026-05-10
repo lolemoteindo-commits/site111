@@ -194,21 +194,32 @@
         <div class="header">
             <div class="logo">⚡</div>
             <h1>UID Manager</h1>
-            <p>Access the system</p>
+            <p>Sign in to continue</p>
         </div>
 
         <div class="info-box">
-            <h3>Welcome</h3>
-            <p>Click the button below to access the UID management system.</p>
+            <h3>Welcome Back!</h3>
+            <p>Sign in to continue to UID Manager.</p>
         </div>
 
-        <div class="form-group" style="text-align: center; margin-bottom: 24px;">
-            <p style="color: #888; font-size: 14px; margin-bottom: 20px;">Click below to access UID Manager</p>
-            <button onclick="enterSystem()" class="login-btn" id="loginBtn" style="width: 200px;">
+        <form id="loginForm">
+            <div class="form-group">
+                <label for="username">Username</label>
+                <input type="text" id="username" name="username" placeholder="Enter your username" required autocomplete="off">
+            </div>
+
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" placeholder="Enter your password" required>
+            </div>
+
+            <button type="submit" class="login-btn" id="loginBtn">
                 <span class="spinner"></span>
-                <span class="btn-text">Enter System</span>
+                <span class="btn-text">Sign In</span>
             </button>
-        </div>
+        </form>
+
+        <div id="result" class="result"></div>
 
         <div class="footer">
             UID Management System
@@ -216,40 +227,65 @@
     </div>
 
     <script>
+        const form = document.getElementById('loginForm');
         const loginBtn = document.getElementById('loginBtn');
+        const result = document.getElementById('result');
 
-        // Auto-redirect if already entered
-        if (localStorage.getItem('userSession')) {
-            window.location.href = 'index.html';
+        // Check if already logged in
+        const token = localStorage.getItem('authToken');
+        if (token) {
+            fetch('/api/verify-session', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ token })
+            }).then(res => {
+                if (res.ok) window.location.href = 'index.html';
+            });
         }
 
-        async function enterSystem() {
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const username = document.getElementById('username').value.trim();
+            const password = document.getElementById('password').value;
+
             loginBtn.classList.add('loading');
+            result.className = 'result';
 
             try {
-                // Call backend (no key needed)
                 const response = await fetch('/api/login', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                         'Accept': 'application/json'
-                    }
+                    },
+                    body: JSON.stringify({ username, password })
                 });
 
                 const data = await response.json();
 
-                // Store session
-                localStorage.setItem('userSession', 'active');
+                if (!response.ok) {
+                    throw new Error(data.error || 'Login failed');
+                }
+
+                // Store auth token
+                localStorage.setItem('authToken', data.token);
+                localStorage.setItem('username', data.username);
                 localStorage.setItem('loginTime', new Date().toISOString());
 
-                // Redirect
-                window.location.href = 'index.html';
+                result.className = 'result success';
+                result.textContent = 'Login successful! Redirecting...';
+
+                setTimeout(() => {
+                    window.location.href = 'index.html';
+                }, 1000);
 
             } catch (error) {
-                alert('Failed to connect. Please try again.');
+                result.className = 'result error';
+                result.textContent = error.message;
                 loginBtn.classList.remove('loading');
             }
-        }
+        });
     </script>
 </body>
 </html>
