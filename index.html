@@ -5,11 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>UID Manager</title>
     <script>
-        // Check if user is authenticated
-        const authToken = localStorage.getItem('authToken');
+        // Check if user has valid session (from sessionStorage - cleared on tab close)
+        const authToken = sessionStorage.getItem('authToken');
         if (!authToken) {
             window.location.href = 'login.html';
         }
+        
+        // Get max days allowed for this key
+        const maxDays = parseInt(sessionStorage.getItem('maxDays')) || 1;
         
         // Verify token with backend
         fetch('/api/verify-session', {
@@ -18,7 +21,7 @@
             body: JSON.stringify({ token: authToken })
         }).then(res => {
             if (!res.ok) {
-                localStorage.clear();
+                sessionStorage.clear();
                 window.location.href = 'login.html';
             }
         });
@@ -239,7 +242,7 @@
             </div>
 
             <div class="form-group">
-                <label for="days">Days to Add (Max: 30)</label>
+                <label for="days">Days to Add (Max: <span id="maxDaysLabel">1</span>)</label>
                 <input type="number" id="days" name="days" value="1" min="1" max="30" required>
             </div>
 
@@ -260,18 +263,22 @@
     </div>
 
     <script>
-        // Display username
-        const currentUser = localStorage.getItem('username') || 'User';
-        document.getElementById('userKey').textContent = currentUser;
+        // Show max days from license key
+        const userMaxDays = parseInt(sessionStorage.getItem('maxDays')) || 1;
+        document.getElementById('maxDaysLabel').textContent = userMaxDays;
+        document.getElementById('days').max = userMaxDays;
         
-        // Show admin link for admin user
-        if (currentUser === 'admin') {
+        // Check if admin (maxDays = 30 means admin key)
+        if (userMaxDays >= 30) {
+            document.getElementById('userKey').textContent = 'Admin';
             document.getElementById('adminLink').style.display = 'inline';
+        } else {
+            document.getElementById('userKey').textContent = 'User (Max ' + userMaxDays + ' days)';
         }
 
         // Logout function
         async function logout() {
-            const token = localStorage.getItem('authToken');
+            const token = sessionStorage.getItem('authToken');
             
             // Call logout endpoint
             try {
@@ -284,7 +291,8 @@
                 // Ignore error
             }
             
-            localStorage.clear();
+            // Clear sessionStorage (not localStorage) - forces re-login with key
+            sessionStorage.clear();
             window.location.href = 'login.html';
         }
 
@@ -305,7 +313,13 @@
             result.className = 'result';
 
             try {
-                const token = localStorage.getItem('authToken');
+                const token = sessionStorage.getItem('authToken');
+                
+                // Check if trying to add more than allowed
+                const userMaxDays = parseInt(sessionStorage.getItem('maxDays')) || 1;
+                if (parseInt(days) > userMaxDays) {
+                    throw new Error(`You can only add up to ${userMaxDays} days with this key`);
+                }
                 
                 // Call backend API with auth token
                 const response = await fetch('/api/add-days', {
